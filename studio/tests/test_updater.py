@@ -20,16 +20,14 @@ class Platform(str, enum.Enum):
   MAC_ARM = "mac_arm"
 
   def get_path_to_zip(self) -> str:
-    return "tools/adt/idea/studio/android-studio.%s.zip" % self.value
+    return f"tools/adt/idea/studio/android-studio.{self.value}.zip"
 
 
 def get_current_platform() -> Platform:
-  major_win_ver = platform.win32_ver()[0]
-  if major_win_ver:
+  if major_win_ver := platform.win32_ver()[0]:
     return Platform.WIN
 
-  major_mac_ver = platform.mac_ver()[0]
-  if major_mac_ver:
+  if major_mac_ver := platform.mac_ver()[0]:
     is_arm = platform.processor() == "arm"
     return Platform.MAC_ARM if is_arm else Platform.MAC
 
@@ -71,22 +69,19 @@ class UpdaterTests(unittest.TestCase):
       AssertionError: the directories differ.
     """
     if dircmp.left_only:
-      self.fail_dircmp(dircmp,
-                       "files found only in left dir: %s" % dircmp.left_only)
+      self.fail_dircmp(dircmp, f"files found only in left dir: {dircmp.left_only}")
     if dircmp.right_only:
-      self.fail_dircmp(dircmp,
-                       "files found only in right dir: %s" % dircmp.right_only)
+      self.fail_dircmp(dircmp, f"files found only in right dir: {dircmp.right_only}")
     if dircmp.common_funny:
       # Note: differing symlinks fall into this category of "common_funny".
       self.fail_dircmp(
-          dircmp, "files found which differ in types or os.stat() results: %s" %
-          dircmp.common_funny)
+          dircmp,
+          f"files found which differ in types or os.stat() results: {dircmp.common_funny}",
+      )
     if dircmp.funny_files:
-      self.fail_dircmp(dircmp,
-                       "files could not be compared: %s" % dircmp.funny_files)
+      self.fail_dircmp(dircmp, f"files could not be compared: {dircmp.funny_files}")
     if dircmp.diff_files:
-      self.fail_dircmp(dircmp,
-                       "files whose contents differ: %s" % dircmp.diff_files)
+      self.fail_dircmp(dircmp, f"files whose contents differ: {dircmp.diff_files}")
 
     # Recurse through subdirectories.
     for sub_dircmp in dircmp.subdirs.values():
@@ -169,12 +164,13 @@ class UpdaterTests(unittest.TestCase):
       process = subprocess.Popen(
           args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
-      print("stdout: %s" % stdout)
-      print("stderr: %s" % stderr)
+      print(f"stdout: {stdout}")
+      print(f"stderr: {stderr}")
       return_code = process.returncode
       if return_code != 0:
-        self.fail("Running the updater (args=%s) failed. Return code: %s" %
-                  (str(args), return_code))
+        self.fail(
+            f"Running the updater (args={args}) failed. Return code: {return_code}"
+        )
 
       # The patcher runs in-place, meaning the old folder will have its contents
       # directly modified rather than producing a copy.
@@ -188,12 +184,13 @@ class UpdaterTests(unittest.TestCase):
       process = subprocess.Popen(
           args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
       stdout, stderr = process.communicate()
-      print("stdout: %s" % stdout)
-      print("stderr: %s" % stderr)
+      print(f"stdout: {stdout}")
+      print(f"stderr: {stderr}")
       return_code = process.returncode
       if return_code != 0:
-        self.fail("Running the patcher (args=%s) failed. Return code: %s" %
-                  (str(args), return_code))
+        self.fail(
+            f"Running the patcher (args={args}) failed. Return code: {return_code}"
+        )
 
       print("Comparing the results")
       dircmp = filecmp.dircmp(old_folder_path, new_folder_path)

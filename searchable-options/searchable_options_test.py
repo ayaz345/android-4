@@ -47,8 +47,9 @@ class SearchableOptionTests(unittest.TestCase):
                 if name == "search/":
                   has_search_entry = True
               if has_searchable_options and not has_search_entry:
-                self.fail("Jar %s contains searchable options xmls, but it does " % jar +
-                  "not have a search/ directory entry. IntelliJ requires the directory entry to find the .xmls")
+                self.fail(
+                    f"Jar {jar} contains searchable options xmls, but it does not have a search/ directory entry. IntelliJ requires the directory entry to find the .xmls"
+                )
 
     eq = self.same_folders(filecmp.dircmp(expected_dir, actual_dir))
     if not eq:
@@ -64,10 +65,7 @@ class SearchableOptionTests(unittest.TestCase):
   def same_folders(self, diff):
     if diff.diff_files:
       return False
-    for sub_diff in diff.subdirs.values():
-      if not self.same_folders(sub_diff):
-        return False
-    return True
+    return all(self.same_folders(sub_diff) for sub_diff in diff.subdirs.values())
 
 if __name__ == "__main__":
   unittest.main()

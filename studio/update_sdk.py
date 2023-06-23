@@ -38,9 +38,16 @@ def list_sdk_jars(sdk):
   sets = {}
   for platform in PLATFORMS:
     idea_home = sdk + HOME_PATHS[platform]
-    jars = ["/lib/" + jar for jar in os.listdir(idea_home + "/lib") if jar.endswith(".jar")]
+    jars = [
+        f"/lib/{jar}" for jar in os.listdir(f"{idea_home}/lib")
+        if jar.endswith(".jar")
+    ]
     # Java plugin sdk are included as part of the platform as there are references to it.
-    jars += ["/plugins/java/lib/" + jar for jar in os.listdir(idea_home + "/plugins/java/lib/") if jar.endswith(".jar")]
+    jars += [
+        f"/plugins/java/lib/{jar}"
+        for jar in os.listdir(f"{idea_home}/plugins/java/lib/")
+        if jar.endswith(".jar")
+    ]
     jars = [jar for jar in jars if jar not in HIDDEN]
     sets[platform] = set(jars)
 
@@ -49,11 +56,7 @@ def list_sdk_jars(sdk):
   sets[WIN] = sets[WIN] - sets[ALL]
   sets[MAC] = sets[MAC] - sets[ALL]
 
-  sdk_jars = {}
-  for platform in [ALL] + PLATFORMS:
-    sdk_jars[platform] = sorted(sets[platform])
-
-  return sdk_jars
+  return {platform: sorted(sets[platform]) for platform in [ALL] + PLATFORMS}
 
 
 def list_plugin_jars(sdk):
@@ -61,21 +64,17 @@ def list_plugin_jars(sdk):
   for platform in PLATFORMS:
     idea_home = sdk + HOME_PATHS[platform]
     all[platform] = {}
-    for plugin in os.listdir(idea_home + "/plugins"):
+    for plugin in os.listdir(f"{idea_home}/plugins"):
       if plugin == "java":
         # The plugin java is added as part of the platform
         continue
-      path = "/plugins/" + plugin + "/lib/"
+      path = f"/plugins/{plugin}/lib/"
       jars = [path + jar for jar in os.listdir(idea_home + path) if jar.endswith(".jar")]
       jars = [jar for jar in jars if jar not in HIDDEN]
       all[platform][plugin] = set(jars)
 
   plugins = sorted(set(all[MAC].keys()) | set(all[WIN].keys()) | set(all[LINUX].keys()))
-  plugin_jars = {}
-  plugin_jars[ALL] = {}
-  plugin_jars[MAC] = {}
-  plugin_jars[WIN] = {}
-  plugin_jars[LINUX] = {}
+  plugin_jars = {ALL: {}, MAC: {}, WIN: {}, LINUX: {}}
   for p in plugins:
     if p in all[LINUX] and p in all[MAC] and p in all[WIN]:
       common = all[LINUX][p] & all[MAC][p] & all[WIN][p]
@@ -126,9 +125,10 @@ def write_spec_file(workspace, sdk_rel, version, sdk_jars, plugin_jars, mac_bund
 # from the preexisting spec.bzl file (since the original mac bundle artifact
 # has already been renamed by this point).
 def extract_preexisting_mac_bundle_name(workspace, version):
-  with open(workspace + "/prebuilts/studio/intellij-sdk/" + version + "/spec.bzl", "r") as spec:
+  with open(f"{workspace}/prebuilts/studio/intellij-sdk/{version}/spec.bzl", "r") as spec:
     search = re.search(r"mac_bundle_name = \"(.*)\"", spec.read())
-    return search.group(1) if search else sys.exit("Failed to find existing mac bundle name")
+    return (search[1]
+            if search else sys.exit("Failed to find existing mac bundle name"))
 
 
 def gen_lib(project_dir, name, jars, srcs):
@@ -144,7 +144,7 @@ def gen_lib(project_dir, name, jars, srcs):
   xml += f'    </SOURCES>\n  </library>\n</component>'
 
   filename = name.replace("-", "_")
-  with open(project_dir + "/.idea/libraries/" + filename + ".xml", "w") as file:
+  with open(f"{project_dir}/.idea/libraries/{filename}.xml", "w") as file:
     file.write(xml)
 
 
@@ -157,7 +157,7 @@ def write_xml_files(workspace, sdk, sdk_jars, plugin_jars):
   paths = [rel_workspace + sdk + "/$SDK_PLATFORM$" + j for j in all_jars]
   gen_lib(project_dir, "studio-sdk", paths, [workspace + sdk + "/android-studio-sources.zip"])
 
-  lib_dir = project_dir + "/.idea/libraries/"
+  lib_dir = f"{project_dir}/.idea/libraries/"
   for lib in os.listdir(lib_dir):
     if lib == "studio_plugin_Kotlin.xml":
       # Special case: the Kotlin plugin is part of IntelliJ Platform, but it is built and updated
@@ -169,16 +169,21 @@ def write_xml_files(workspace, sdk, sdk_jars, plugin_jars):
 
   for plugin, jars in plugin_jars[ALL].items():
     add = sorted(set(plugin_jars[WIN][plugin] + plugin_jars[MAC][plugin] + plugin_jars[LINUX][plugin]))
-    paths = [ rel_workspace + sdk + f"/$SDK_PLATFORM$" + j for j in jars + add]
-    gen_lib(project_dir, "studio-plugin-" + plugin, paths, [workspace + sdk + "/android-studio-sources.zip"])
+    paths = [rel_workspace + sdk + "/$SDK_PLATFORM$" + j for j in jars + add]
+    gen_lib(
+        project_dir,
+        f"studio-plugin-{plugin}",
+        paths,
+        [workspace + sdk + "/android-studio-sources.zip"],
+    )
 
   updater_jar = rel_workspace + sdk + "/updater-full.jar"
-  if os.path.exists(project_dir + "/" + updater_jar):
+  if os.path.exists(f"{project_dir}/{updater_jar}"):
     gen_lib(project_dir, "intellij-updater", [updater_jar], [workspace + sdk + "/android-studio-sources.zip"])
 
 
 def update_files(workspace, version, mac_bundle_name):
-  sdk = "/prebuilts/studio/intellij-sdk/" + version
+  sdk = f"/prebuilts/studio/intellij-sdk/{version}"
 
   sdk_jars = list_sdk_jars(workspace + sdk)
   plugin_jars = list_plugin_jars(workspace + sdk)
@@ -190,20 +195,20 @@ def update_files(workspace, version, mac_bundle_name):
 def check_artifacts(dir):
   files = sorted(os.listdir(dir))
   if not files:
-    sys.exit("There are no artifacts in " + dir)
+    sys.exit(f"There are no artifacts in {dir}")
   regex = re.compile("android-studio-([^.]*)\.(.*)\.([^.-]+)(-sources.zip|.mac.x64.zip|-no-jbr.tar.gz|.win.zip)$")
   files = [file for file in files if regex.match(file) or file == "updater-full.jar"]
   if not files:
-    sys.exit("No artifacts found in " + dir)
+    sys.exit(f"No artifacts found in {dir}")
   match = regex.match(files[0])
-  version_major = match.group(1)
-  version_minor = match.group(2)
-  bid = match.group(3)
+  version_major = match[1]
+  version_minor = match[2]
+  bid = match[3]
   expected = [
-      "android-studio-%s.%s.%s-no-jbr.tar.gz" % (version_major, version_minor, bid),
-      "android-studio-%s.%s.%s-sources.zip" % (version_major, version_minor, bid),
-      "android-studio-%s.%s.%s.mac.x64.zip" % (version_major, version_minor, bid),
-      "android-studio-%s.%s.%s.win.zip" % (version_major, version_minor, bid),
+      f"android-studio-{version_major}.{version_minor}.{bid}-no-jbr.tar.gz",
+      f"android-studio-{version_major}.{version_minor}.{bid}-sources.zip",
+      f"android-studio-{version_major}.{version_minor}.{bid}.mac.x64.zip",
+      f"android-studio-{version_major}.{version_minor}.{bid}.win.zip",
       "updater-full.jar",
   ]
   if files != expected:
@@ -211,14 +216,19 @@ def check_artifacts(dir):
     print(expected)
     print("Got:")
     print(files)
-    sys.exit("Unexpected artifacts in " + dir)
+    sys.exit(f"Unexpected artifacts in {dir}")
 
-  manifest = None
-  manifests = glob.glob(dir + "/manifest_*.xml")
-  if len(manifests) == 1:
-    manifest = os.path.basename(manifests[0])
-
-  return "AI-" + version_major, files[0], files[1], files[2], files[3], files[4], manifest
+  manifests = glob.glob(f"{dir}/manifest_*.xml")
+  manifest = os.path.basename(manifests[0]) if len(manifests) == 1 else None
+  return (
+      f"AI-{version_major}",
+      files[0],
+      files[1],
+      files[2],
+      files[3],
+      files[4],
+      manifest,
+  )
 
 
 def download(workspace, bid):
@@ -240,10 +250,10 @@ sudo apt install android-fetch-artifact""")
     sys.exit("--bid argument needs to be set to download")
   dir = tempfile.mkdtemp(prefix="studio_sdk", suffix=bid)
 
-  for artifact in ["android-studio-*-sources.zip", "android-studio-*.mac.x64.zip", "android-studio-*-no-jbr.tar.gz", "android-studio-*.win.zip", "updater-full.jar", "manifest_%s.xml" % bid]:
+  for artifact in ["android-studio-*-sources.zip", "android-studio-*.mac.x64.zip", "android-studio-*-no-jbr.tar.gz", "android-studio-*.win.zip", "updater-full.jar", f"manifest_{bid}.xml"]:
     os.system(
-        "%s %s --bid %s --target IntelliJ '%s' %s"
-        % (fetch_artifact, auth_flag, bid, artifact, dir))
+        f"{fetch_artifact} {auth_flag} --bid {bid} --target IntelliJ '{artifact}' {dir}"
+    )
 
   return dir
 
@@ -251,40 +261,43 @@ sudo apt install android-fetch-artifact""")
 def write_metadata(path, data):
   with open(os.path.join(path, "METADATA"), "w") as file:
     for k, v in data.items():
-      file.write(k + ": " + str(v) + "\n")
+      file.write(f"{k}: {str(v)}" + "\n")
 
 def extract(workspace, dir, delete_after, metadata):
   version, linux, sources, mac, win, updater, manifest = check_artifacts(dir)
-  path = workspace + "/prebuilts/studio/intellij-sdk/" + version
+  path = f"{workspace}/prebuilts/studio/intellij-sdk/{version}"
 
   if os.path.exists(path):
     shutil.rmtree(path)
 
   os.mkdir(path)
-  shutil.copyfile(dir + "/" + sources, path + "/android-studio-sources.zip")
-  shutil.copyfile(dir + "/" + updater, path + "/updater-full.jar")
+  shutil.copyfile(f"{dir}/{sources}", f"{path}/android-studio-sources.zip")
+  shutil.copyfile(f"{dir}/{updater}", f"{path}/updater-full.jar")
 
   print("Unzipping mac distribution...")
   # Call to unzip to preserve mac symlinks
-  os.system("unzip -q -d \"%s\" \"%s\"" % (path + "/darwin", dir + "/" + mac))
+  os.system("unzip -q -d \"%s\" \"%s\"" % (f"{path}/darwin", f"{dir}/{mac}"))
   # Mac is the only one that contains the version in the directory, rename for
   # consistency with other platforms and easier tooling
-  apps = ["/darwin/" + app for app in os.listdir(path + "/darwin") if app.startswith("Android Studio")]
+  apps = [
+      f"/darwin/{app}" for app in os.listdir(f"{path}/darwin")
+      if app.startswith("Android Studio")
+  ]
   if len(apps) != 1:
     sys.exit("Only one directory starting with Android Studio expected for Mac")
-  os.rename(path + apps[0], path + "/darwin/android-studio")
+  os.rename(path + apps[0], f"{path}/darwin/android-studio")
   mac_bundle_name = os.path.basename(apps[0])
 
   print("Unzipping windows distribution...")
-  with zipfile.ZipFile(dir + "/" + win, "r") as zip:
-    zip.extractall(path + "/windows")
+  with zipfile.ZipFile(f"{dir}/{win}", "r") as zip:
+    zip.extractall(f"{path}/windows")
 
   print("Untaring linux distribution...")
-  with tarfile.open(dir + "/" + linux, "r") as tar:
-    tar.extractall(path + "/linux")
+  with tarfile.open(f"{dir}/{linux}", "r") as tar:
+    tar.extractall(f"{path}/linux")
 
   if manifest:
-    xml = ET.parse(dir + "/" + manifest)
+    xml = ET.parse(f"{dir}/{manifest}")
     for project in xml.getroot().findall("project"):
       metadata[project.get("path")] = project.get("revision")
 
@@ -300,18 +313,17 @@ def main(workspace, args):
   mac_bundle_name = None
   version = args.version
   path = args.path
-  bid = args.download
   delete_path = False
   if path:
     metadata["path"] = path
-  if bid:
+  if bid := args.download:
     metadata["build_id"] = bid
     path = download(workspace, bid)
     delete_path = not args.debug_download
   if path:
     version, mac_bundle_name = extract(workspace, path, delete_path, metadata)
     if args.debug_download:
-      print("Dowloaded artifacts kept at " + path)
+      print(f"Dowloaded artifacts kept at {path}")
   else:
     mac_bundle_name = extract_preexisting_mac_bundle_name(workspace, version)
 

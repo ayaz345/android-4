@@ -19,17 +19,17 @@ def load_include(include, external_xmls, cwd, index):
     if not m:
       print("only xpointers of the form xpointer(xpath) are supported")
       sys.exit(1)
-    xpath = m.group(1)
+    xpath = m[1]
   is_optional = any(child.tag == "{http://www.w3.org/2001/XInclude}fallback" for child in include)
 
-  rel = href[1:] if href.startswith("/") else cwd + "/" + href
+  rel = href[1:] if href.startswith("/") else f"{cwd}/{href}"
 
   if rel in external_xmls or is_optional:
     return [], None
-  new_cwd = rel[0:rel.rindex("/")]
+  new_cwd = rel[:rel.rindex("/")]
 
   if rel not in index:
-    print("Cannot find file to include %s" % href)
+    print(f"Cannot find file to include {href}")
     sys.exit(1)
 
   with zipfile.ZipFile(index[rel]) as jar:
@@ -40,15 +40,13 @@ def load_include(include, external_xmls, cwd, index):
     return [e], new_cwd
 
   if not xpath.startswith("/"):
-    print("Unexpected xpath %s. Only absolute paths are supported" % xpath)
+    print(f"Unexpected xpath {xpath}. Only absolute paths are supported")
     sys.exit(1)
 
-  ret = []
   root, path = xpath[1:].split("/", 1)
-  if root == e.tag:
-    ret = e.findall("./" + path)
+  ret = e.findall(f"./{path}") if root == e.tag else []
   if not ret:
-    print("While including %s, the path %s," % (rel, xpath))
+    print(f"While including {rel}, the path {xpath},")
     print("did not produce any elements to include")
     sys.exit(1)
 
@@ -73,12 +71,11 @@ def resolve_includes(elem, external_xmls, cwd, index):
       subtree = ET.Element("nodes")
       subtree.extend(nodes)
       resolve_includes(subtree, external_xmls, new_cwd, index)
-      nodes = list(subtree)
-      if nodes:
+      if nodes := list(subtree):
         for node in nodes[:-1]:
           elem.insert(i, node)
           i = i + 1
-        node = nodes[len(nodes)-1]
+        node = nodes[-1]
         if e.tail:
           node.tail = (node.tail or "") + e.tail
         elem[i] = node
@@ -95,7 +92,7 @@ def check_plugin(plugin_id, files, deps, external_xmls, out):
       with zipfile.ZipFile(file) as jar:
         for jar_entry in jar.namelist():
           if jar_entry == "META-INF/plugin.xml":
-            xmls[file + "!" + jar_entry] = jar.read(jar_entry)
+            xmls[f"{file}!{jar_entry}"] = jar.read(jar_entry)
           if not jar_entry.endswith("/"):
             # TODO: Investigate if we can have a strict mode where we fail on duplicate
             # files across jars in the same plugin. Currently even IJ plugins fail with
@@ -118,7 +115,7 @@ def check_plugin(plugin_id, files, deps, external_xmls, out):
     ids = [id.text for id in element.findall("name")]
 
   if len(ids) != 1:
-    print("Expected exactly one id, but found [%s]" % ",".join(ids))
+    print(f'Expected exactly one id, but found [{",".join(ids)}]')
     sys.exit(1)
   found_id = ids[0]
   # We cannot use ElementInclude because it does not support xpointer
@@ -128,12 +125,14 @@ def check_plugin(plugin_id, files, deps, external_xmls, out):
     sys.exit(1)
 
   if element.tag != 'idea-plugin':
-    print("Expected plugin.xml root item to be 'idea-plugin' but was %s" % element.tag)
+    print(
+        f"Expected plugin.xml root item to be 'idea-plugin' but was {element.tag}"
+    )
     sys.exit(1)
 
   if element.attrib.get("allow-bundled-update", "false") != "false" and found_id != "org.jetbrains.kotlin":
-      print("Bundled plugin update are not allowed for plugin: %s" % found_id)
-      sys.exit(1)
+    print(f"Bundled plugin update are not allowed for plugin: {found_id}")
+    sys.exit(1)
 
   if deps is not None:
     depends_xml = set()

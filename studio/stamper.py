@@ -54,7 +54,8 @@ def _stamp_plugin_file(build, content):
   """Stamps a plugin.xml with the build ids."""
 
   # TODO: Start with the IJ way of doing this, but move to a more robust/strict later.
-  content = re.sub("<version>[\\d.]*</version>", "<version>%s</version>" % build, content, 1)
+  content = re.sub("<version>[\\d.]*</version>", f"<version>{build}</version>",
+                   content, 1)
   content = re.sub("<idea-version\\s+since-build=\"\\d+\\.\\d+\"\\s+until-build=\"\\d+\\.\\d+\"",
                    "<idea-version since-build=\"%s\" until-build=\"%s\"" % (build, build),
                    content, 1)
@@ -84,12 +85,12 @@ def _find_file(zip_path, entry, sub_entry):
         with zipfile.ZipFile(io.BytesIO(data)) as sub:
           if sub_entry in sub.namelist():
             if entry_name:
-              print("Multiple " + sub_entry + " found in " + zip_path + "!" + entry)
+              print(f"Multiple {sub_entry} found in {zip_path}!{entry}")
               sys.exit(1)
             entry_name = name
             content = sub.read(sub_entry)
     if not entry_name:
-      print(sub_entry + " not found in " + zip_path)
+      print(f"{sub_entry} not found in {zip_path}")
       sys.exit(1)
   return entry_name, content.decode("utf-8")
 
@@ -141,7 +142,7 @@ def _stamp_plugin(platform, os, build_info, overwrite_plugin_version, src, dst):
   bid = _get_build_id(build_info)
 
   if overwrite_plugin_version:
-    build_txt = _read_file(platform, resource_path + "build.txt")
+    build_txt = _read_file(platform, f"{resource_path}build.txt")
     content = _stamp_plugin_file(build_txt[3:], content)
 
   content = content.replace("__BUILD_NUMBER__", bid)
@@ -163,15 +164,18 @@ def _produce_manifest(platform, os, build_info, build_version, channel,
   base_path = BASE_PATH[os]
   bid = _get_build_id(build_info)
 
-  build_txt = _read_file(platform, resource_path + "build.txt")
-  app_info = _read_file(platform, base_path + "lib/resources.jar",
-                        "idea/AndroidStudioApplicationInfo.xml")
+  build_txt = _read_file(platform, f"{resource_path}build.txt")
+  app_info = _read_file(
+      platform,
+      f"{base_path}lib/resources.jar",
+      "idea/AndroidStudioApplicationInfo.xml",
+  )
 
   m = re.search(r'version.*major="(\d+)"', app_info)
-  major = m.group(1)
+  major = m[1]
 
   m = re.search(r'version.*minor="(\d+)"', app_info)
-  minor = m.group(1)
+  minor = m[1]
 
   build_txt = build_txt.replace("__BUILD_NUMBER__", bid)
   build_date = _format_build_date(build_version)
@@ -179,7 +183,7 @@ def _produce_manifest(platform, os, build_info, build_version, channel,
   # Remove the product code (e.g. "AI-")
   build_number = build_txt[3:]
 
-  channel = "CHANNEL_" + channel.upper()
+  channel = f"CHANNEL_{channel.upper()}"
 
   contents = ('major: {major}\n'
              'minor: {minor}\n'
@@ -202,25 +206,35 @@ def _stamp_platform(platform, os, build_info, build_version, eap, micro, patch, 
   base_path = BASE_PATH[os]
   bid = _get_build_id(build_info)
 
-  build_txt = _read_file(platform, resource_path + "build.txt")
-  app_info = _read_file(platform, base_path + "lib/resources.jar", "idea/AndroidStudioApplicationInfo.xml")
+  build_txt = _read_file(platform, f"{resource_path}build.txt")
+  app_info = _read_file(
+      platform,
+      f"{base_path}lib/resources.jar",
+      "idea/AndroidStudioApplicationInfo.xml",
+  )
 
   build_txt = build_txt.replace("__BUILD_NUMBER__", bid)
   build_date = _format_build_date(build_version)
   app_info = _stamp_app_info(build_date, build_txt, micro, patch, full, eap, app_info)
 
-  _write_file(out, "w", build_txt, resource_path + "build.txt")
-  _write_file(out, "a", app_info, base_path + "lib/resources.jar", "idea/AndroidStudioApplicationInfo.xml")
+  _write_file(out, "w", build_txt, f"{resource_path}build.txt")
+  _write_file(
+      out,
+      "a",
+      app_info,
+      f"{base_path}lib/resources.jar",
+      "idea/AndroidStudioApplicationInfo.xml",
+  )
 
-  if os == "linux" or os == "mac" or os == "mac_arm":
-    product_info_json = _read_file(platform, resource_path + "product-info.json")
+  if os in ["linux", "mac", "mac_arm"]:
+    product_info_json = _read_file(platform, f"{resource_path}product-info.json")
     product_info_json = _stamp_product_info_json(bid, build_txt, product_info_json)
-    _write_file(out, "a", product_info_json, resource_path + "product-info.json")
+    _write_file(out, "a", product_info_json, f"{resource_path}product-info.json")
 
-  if os == "mac" or os == "mac_arm":
-    info_plist = _read_file(platform, base_path + "Info.plist")
+  if os in ["mac", "mac_arm"]:
+    info_plist = _read_file(platform, f"{base_path}Info.plist")
     info_plist = info_plist.replace("__BUILD_NUMBER__", bid)
-    _write_file(out, "a", info_plist, base_path + "Info.plist")
+    _write_file(out, "a", info_plist, f"{base_path}Info.plist")
 
 
 def main(argv):

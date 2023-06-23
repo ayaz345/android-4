@@ -22,18 +22,21 @@ def run_verifier(verifier, ide, plugin, jre, ignored_problems, report_dir):
 
   # See https://github.com/JetBrains/intellij-plugin-verifier#check-plugin.
   cmd = [
-    verifier,
-    "--jvm_flag=-Dplugin.verifier.home.dir=%s" % verifier_home,
-    "check-plugin",
-    "path:%s" % plugin,
-    ide,
-    "-runtime-dir", jre,
-    "-ignored-problems", ignored_problems,
-    "-verification-reports-dir", report_dir,
-    "-offline",
+      verifier,
+      f"--jvm_flag=-Dplugin.verifier.home.dir={verifier_home}",
+      "check-plugin",
+      f"path:{plugin}",
+      ide,
+      "-runtime-dir",
+      jre,
+      "-ignored-problems",
+      ignored_problems,
+      "-verification-reports-dir",
+      report_dir,
+      "-offline",
   ]
 
-  print("Running the verifier and logging to %s" % log, flush=True)
+  print(f"Running the verifier and logging to {log}", flush=True)
   with open(log, 'w') as logfile:
     result = subprocess.run(cmd, stdout=logfile)
     if result.returncode != 0:
@@ -60,7 +63,7 @@ def check_verifier_result(report_dir):
       if name in ["invalid-plugin.txt", "compatibility-problems.txt"]:
         with open(path) as error_file:
           print("\nERRORS:\n\n%s\n" % error_file.read().strip())
-        fail("Found problems in %s (see log)" % short_path)
+        fail(f"Found problems in {short_path} (see log)")
 
   if verdict is None:
     fail("Failed to find verification-verdict.txt")
@@ -77,7 +80,7 @@ if __name__ == '__main__':
   parser.add_argument("--ignored_problems", required=True)
   args = parser.parse_args()
 
-  print("Unzipping IDE from %s" % args.ide_zip)
+  print(f"Unzipping IDE from {args.ide_zip}")
   ide_unzipped = os.path.join(tmpdir, "ide_unzipped")
   shutil.unpack_archive(args.ide_zip, ide_unzipped)
 

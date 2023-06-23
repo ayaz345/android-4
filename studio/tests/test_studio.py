@@ -16,19 +16,19 @@ class StudioTests(unittest.TestCase):
 
     actual = {}
     for platform in PLATFORMS:
-      name = "tools/adt/idea/studio/android-studio.%s.zip" % platform
+      name = f"tools/adt/idea/studio/android-studio.{platform}.zip"
       with zipfile.ZipFile(name) as file:
         actual[platform] = sorted(file.namelist())
 
     expected = {}
     for platform in PLATFORMS:
-      with open("tools/adt/idea/studio/tests/expected_%s.txt" % platform, "r") as txt:
+      with open(f"tools/adt/idea/studio/tests/expected_{platform}.txt", "r") as txt:
         expected[platform] = [line.strip() for line in sorted(txt.readlines())]
 
     for platform in PLATFORMS:
       if expected != actual:
         undeclared_dir = os.getenv("TEST_UNDECLARED_OUTPUTS_DIR")
-        with open("%s/expected_%s.txt" % (undeclared_dir, platform), "w") as new_ex:
+        with open(f"{undeclared_dir}/expected_{platform}.txt", "w") as new_ex:
           new_ex.writelines([line + "\n" for line in actual[platform]])
         print("You can find the newly expected file in the undeclared output directory.")
 
@@ -44,9 +44,12 @@ class StudioTests(unittest.TestCase):
     name = "tools/adt/idea/studio/android-studio.mac.zip"
     file = zipfile.ZipFile(name)
     for f in file.namelist():
-      m = re.search("Android Studio.*\\.app/Contents/([^/]+)$", f)
-      if m:
-        self.assertEqual(m.group(1), "Info.plist", "Only Info.plist should be present in Contents (Found " + m.group(1) + ")")
+      if m := re.search("Android Studio.*\\.app/Contents/([^/]+)$", f):
+        self.assertEqual(
+            m[1],
+            "Info.plist",
+            f"Only Info.plist should be present in Contents (Found {m[1]})",
+        )
 
   def test_mac_filelist(self):
     """Tests whether the _codesign/filelist file is up to date.
@@ -66,15 +69,22 @@ class StudioTests(unittest.TestCase):
       # ignore ARM specific files
       if "arm64" in line:
         continue
-      self.assertIn(line, namelist, "%s is in _codesign/filelist but is not present in distribution" % line)
+      self.assertIn(
+          line,
+          namelist,
+          f"{line} is in _codesign/filelist but is not present in distribution",
+      )
 
   def test_no_build_files(self):
     for platform in PLATFORMS:
-      name = "tools/adt/idea/studio/android-studio.%s.zip" % platform
+      name = f"tools/adt/idea/studio/android-studio.{platform}.zip"
       with zipfile.ZipFile(name) as file:
         for f in file.infolist():
-          self.assertFalse(f.filename.endswith("/BUILD") or f.filename.endswith("/BUILD.bazel"),
-                           "Unexpected BUILD file in zip " + name + ": " + f.filename)
+          self.assertFalse(
+              f.filename.endswith("/BUILD")
+              or f.filename.endswith("/BUILD.bazel"),
+              f"Unexpected BUILD file in zip {name}: {f.filename}",
+          )
 
   def test_game_tools_artifacts_are_present(self):
     all_required = [
@@ -93,13 +103,13 @@ class StudioTests(unittest.TestCase):
         ],
     }
 
-    for platform in archive_files_required.keys():
-      name = "tools/adt/idea/studio/android-studio.%s.zip" % platform
+    for platform, value in archive_files_required.items():
+      name = f"tools/adt/idea/studio/android-studio.{platform}.zip"
       with zipfile.ZipFile(name) as file:
         files = file.namelist()
-      for req in all_required + archive_files_required[platform]:
+      for req in all_required + value:
         if not any(file_name.endswith(req) for file_name in files):
-          self.fail("Required file " + req + " not found in " + platform  + " distribution.")
+          self.fail(f"Required file {req} not found in {platform} distribution.")
 
   def test_profiler_artifacts_are_present(self):
     all_required = [
@@ -108,13 +118,13 @@ class StudioTests(unittest.TestCase):
     ]
     for abi in ["x86", "arm64-v8a", "armeabi-v7a"]:
       all_required += [
-          "plugins/android/resources/perfetto/%s/libperfetto.so" % abi,
-          "plugins/android/resources/perfetto/%s/perfetto" % abi,
-          "plugins/android/resources/perfetto/%s/traced" % abi,
-          "plugins/android/resources/perfetto/%s/traced_probes" % abi,
-          "plugins/android/resources/simpleperf/%s/simpleperf" % abi,
-          "plugins/android/resources/transport/%s/transport" % abi,
-          "plugins/android/resources/transport/native/agent/%s/libjvmtiagent.so" % abi,
+          f"plugins/android/resources/perfetto/{abi}/libperfetto.so",
+          f"plugins/android/resources/perfetto/{abi}/perfetto",
+          f"plugins/android/resources/perfetto/{abi}/traced",
+          f"plugins/android/resources/perfetto/{abi}/traced_probes",
+          f"plugins/android/resources/simpleperf/{abi}/simpleperf",
+          f"plugins/android/resources/transport/{abi}/transport",
+          f"plugins/android/resources/transport/native/agent/{abi}/libjvmtiagent.so",
       ]
 
     archive_files_required = {
@@ -129,24 +139,24 @@ class StudioTests(unittest.TestCase):
         ],
     }
 
-    for platform in archive_files_required.keys():
-      name = "tools/adt/idea/studio/android-studio.%s.zip" % platform
+    for platform, value in archive_files_required.items():
+      name = f"tools/adt/idea/studio/android-studio.{platform}.zip"
       with zipfile.ZipFile(name) as file:
         files = file.namelist()
-      for req in all_required + archive_files_required[platform]:
+      for req in all_required + value:
         if not any(file_name.endswith(req) for file_name in files):
-          self.fail("Required file " + req + "not found in " + platform  + " distribution.")
+          self.fail(f"Required file {req}not found in {platform} distribution.")
 
   def test_trace_agent_jar_present(self):
     """Tests that trace_agent.jar is included in distribution"""
     expected = "plugins/android/resources/trace_agent.jar"
 
     for platform in PLATFORMS:
-      name = "tools/adt/idea/studio/android-studio.%s.zip" % platform
+      name = f"tools/adt/idea/studio/android-studio.{platform}.zip"
       with zipfile.ZipFile(name) as file:
         files = file.namelist()
       if not any(file_name.endswith(expected) for file_name in files):
-        self.fail("Required file not found in distribution: " + expected)
+        self.fail(f"Required file not found in distribution: {expected}")
 
   def test_mac_attributes(self):
     name = "tools/adt/idea/studio/android-studio.mac.zip"
@@ -159,17 +169,17 @@ class StudioTests(unittest.TestCase):
           self.assertFalse(is_symlink, "Contents/jbr/Contents/MacOS/libjli.dylib should not be symlink")
         elif f.filename.endswith("Contents/MacOS/studio"):
           self.assertFalse(f.external_attr == 0x1ED0000, "studio should be \"-rwxr-xr-x\"")
-          self.assertFalse(is_symlink, f.filename + " should not be a symlink")
+          self.assertFalse(is_symlink, f"{f.filename} should not be a symlink")
         elif f.filename.endswith(".app/Contents/Info.plist"):
           self.assertTrue(f.external_attr == 0x81B40000, "Info.plist should be \"-rw-r--r--\"")
         else:
           self.assertFalse(f.external_attr == 0, "Unix attributes are missing from the entry")
-          self.assertFalse(is_symlink, f.filename + " should not be a symlink")
+          self.assertFalse(is_symlink, f"{f.filename} should not be a symlink")
       self.assertTrue(found, "Android Studio.*.app/Contents/jbr/Contents/MacOS/libjli.dylib not found")
 
   def test_all_files_writable(self):
     for platform in PLATFORMS:
-      name = "tools/adt/idea/studio/android-studio.%s.zip" % platform
+      name = f"tools/adt/idea/studio/android-studio.{platform}.zip"
       with zipfile.ZipFile(name) as file:
         for f in file.infolist():
           if f.external_attr & 0x1800000 != 0x1800000:

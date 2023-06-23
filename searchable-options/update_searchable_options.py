@@ -17,63 +17,63 @@ SEARCHABLE_OPTIONS_SUFFIX = ".searchableOptions.xml"
 def extract_file(zip_file, info, extract_dir):
     """ Extracts a file preserving file attributes. """
     out_path = zip_file.extract(info.filename, path=extract_dir)
-    attr = info.external_attr >> 16
-    if attr:
-      os.chmod(out_path, attr)
+    if attr := info.external_attr >> 16:
+        os.chmod(out_path, attr)
 
 
 def generate_searchable_options(work_dir, out_dir):
-  """Generates the xmls in out_dir, using work_dir as a scratch pad."""
+    """Generates the xmls in out_dir, using work_dir as a scratch pad."""
 
-  suffix = {
-    "Windows": "win",
-    "Linux": "linux",
-    "Darwin": "mac",
-  }
-  zip_path = os.path.join("tools/adt/idea/studio/android-studio.%s.zip" % suffix[platform.system()])
-  with zipfile.ZipFile(zip_path) as zip_file:
-    for info in zip_file.infolist():
-      extract_file(zip_file, info, work_dir)
+    suffix = {
+      "Windows": "win",
+      "Linux": "linux",
+      "Darwin": "mac",
+    }
+    zip_path = os.path.join(
+        f"tools/adt/idea/studio/android-studio.{suffix[platform.system()]}.zip"
+    )
+    with zipfile.ZipFile(zip_path) as zip_file:
+      for info in zip_file.infolist():
+        extract_file(zip_file, info, work_dir)
 
-  vmoptions_file = "%s/studio.vmoptions" % work_dir
-  with open(vmoptions_file, "w") as props:
-    props.writelines([
-        "-Didea.config.path=%s/config\n" % work_dir,
-        "-Didea.system.path=%s/system\n" % work_dir,
-        "-Duser.home=%s/home\n" % work_dir])
+    vmoptions_file = f"{work_dir}/studio.vmoptions"
+    with open(vmoptions_file, "w") as props:
+      props.writelines([
+          "-Didea.config.path=%s/config\n" % work_dir,
+          "-Didea.system.path=%s/system\n" % work_dir,
+          "-Duser.home=%s/home\n" % work_dir])
 
-  env = {
-      "STUDIO_VM_OPTIONS": vmoptions_file,
-      "XDG_DATA_HOME": "%s/data" % work_dir,
-      "SHELL": os.getenv("SHELL", "")
-  }
-  options_dir = os.path.join(work_dir, "options")
+    env = {
+        "STUDIO_VM_OPTIONS": vmoptions_file,
+        "XDG_DATA_HOME": f"{work_dir}/data",
+        "SHELL": os.getenv("SHELL", ""),
+    }
+    options_dir = os.path.join(work_dir, "options")
 
-  studio_bin = {
-    "Windows": "/android-studio/bin/studio.cmd",
-    "Linux": "/android-studio/bin/studio.sh",
-    "Darwin": "/Android Studio*.app/Contents/MacOS/studio",
-  }
-  [bin_path] = glob.glob(work_dir + studio_bin[platform.system()])
-  subprocess.call([bin_path, "traverseUI", options_dir, "true"], env=env)
+    studio_bin = {
+      "Windows": "/android-studio/bin/studio.cmd",
+      "Linux": "/android-studio/bin/studio.sh",
+      "Darwin": "/Android Studio*.app/Contents/MacOS/studio",
+    }
+    [bin_path] = glob.glob(work_dir + studio_bin[platform.system()])
+    subprocess.call([bin_path, "traverseUI", options_dir, "true"], env=env)
 
-  plugin_list = []
-  with open("tools/adt/idea/studio/android-studio.plugin.lst", "r") as list_file:
-    plugin_list = list_file.read().splitlines()
+    plugin_list = []
+    with open("tools/adt/idea/studio/android-studio.plugin.lst", "r") as list_file:
+      plugin_list = list_file.read().splitlines()
 
-  # Created expected tree
-  regex = re.compile(r"plugins\.([^.]+)\.lib\.([^.]+\.jar)")
-  for name in os.listdir(options_dir):
-    match = regex.match(name)
-    if match:
-      plugin = match.group(1)
-      jar = match.group(2)
-      if plugin in plugin_list:
-        target_dir = os.path.join(out_dir, plugin, jar, "search")
-        os.makedirs(target_dir, exist_ok=True)
-        src = os.path.join(options_dir, name, "search", name + SEARCHABLE_OPTIONS_SUFFIX)
-        shutil.move(src, os.path.join(target_dir, jar + SEARCHABLE_OPTIONS_SUFFIX))
-  return plugin_list
+    # Created expected tree
+    regex = re.compile(r"plugins\.([^.]+)\.lib\.([^.]+\.jar)")
+    for name in os.listdir(options_dir):
+        if match := regex.match(name):
+            plugin = match[1]
+            jar = match[2]
+            if plugin in plugin_list:
+              target_dir = os.path.join(out_dir, plugin, jar, "search")
+              os.makedirs(target_dir, exist_ok=True)
+              src = os.path.join(options_dir, name, "search", name + SEARCHABLE_OPTIONS_SUFFIX)
+              shutil.move(src, os.path.join(target_dir, jar + SEARCHABLE_OPTIONS_SUFFIX))
+    return plugin_list
 
 
 def remove_empty(path, remove):
@@ -86,13 +86,16 @@ def remove_empty(path, remove):
 
 
 def update_searchable_options(work_dir, workspace_dir):
-  so_dir = os.path.join(workspace_dir, "tools/adt/idea/searchable-options")
-  files = glob.glob(os.path.join(so_dir, "**/*" + SEARCHABLE_OPTIONS_SUFFIX), recursive=True)
-  for file in files:
-    os.remove(file)
-  remove_empty(so_dir, False)
+    so_dir = os.path.join(workspace_dir, "tools/adt/idea/searchable-options")
+    files = glob.glob(
+        os.path.join(so_dir, f"**/*{SEARCHABLE_OPTIONS_SUFFIX}"),
+        recursive=True,
+    )
+    for file in files:
+      os.remove(file)
+    remove_empty(so_dir, False)
 
-  generate_searchable_options(work_dir, so_dir)
+    generate_searchable_options(work_dir, so_dir)
 
 
 def find_workspace():
